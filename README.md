@@ -1,2 +1,2 @@
-# ec20
-quectel 4G LTE module driver for TiJOS
+# sensor-driver-template
+Project template for new TiJOS sensor driver 
