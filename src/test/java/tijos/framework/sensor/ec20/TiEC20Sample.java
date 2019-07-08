@@ -45,6 +45,7 @@ public class TiEC20Sample {
 			System.out.println("Start...");
 			ec20.startup();
 
+			System.out.println(" Model : " + ec20.getModel());
 			System.out.println(" IMSI : " + ec20.getIMSI());
 			System.out.println(" IMEI : " + ec20.getIMEI());
 			System.out.println(" RSSI : " + ec20.getRSSI());
@@ -54,6 +55,13 @@ public class TiEC20Sample {
 			System.out.println(" Is registered : " + ec20.isNetworkRegistred());
 
 			System.out.println("IP Address " + ec20.getIPAddress());
+			
+			//ec20.sendSMS("13810314817", "message from ec20");
+			
+			ec20.tunOnGPS();
+			
+			GPSPosition position = ec20.getGPSPosition();
+			
  	
 			MQTTClient mqtt = ec20.getMqttClient("mqtt.tijcloud.com", 1883, MQTTClient.generateClientId());
 			
@@ -62,16 +70,10 @@ public class TiEC20Sample {
 			MQTTConnectOptions options = new MQTTConnectOptions();
 			mqtt.connect(options);
 
-			mqtt.subscribe(1, "topic1", "topic2");
+			mqtt.subscribe(1,   "topic2");
 	
 			for(int i = 0; i < 10; i ++) {
 				mqtt.publish("topic1", "this is a test2", 1, false);
-				Delay.msDelay(1000);
-			}
-			
-			
-			int loop = 100;
-			while(loop -- > 0) {
 				Delay.msDelay(1000);
 			}
 			

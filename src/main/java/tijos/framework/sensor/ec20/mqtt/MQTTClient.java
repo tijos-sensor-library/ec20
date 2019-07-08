@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import tijos.framework.sensor.ec20.IEC20MqttEventListener;
 import tijos.framework.sensor.ec20.TiEC20;
+import tijos.framework.util.Delay;
 
 public class MQTTClient implements IEC20MqttEventListener {
 
@@ -24,7 +25,7 @@ public class MQTTClient implements IEC20MqttEventListener {
 	private TiEC20 _ec20;
 
 	private int _msgId;
-	
+
 	private IMQTTEventListener _mqttEventListener = null;
 
 	/**
@@ -57,10 +58,9 @@ public class MQTTClient implements IEC20MqttEventListener {
 	 */
 	public void setEventListener(IMQTTEventListener listener) {
 		_mqttEventListener = listener;
-		this._ec20.setEventListener(this); 
+		this._ec20.setEventListener(this);
 	}
 
-	
 	/**
 	 * Returns a randomly generated client identifier based on the the fixed prefix
 	 * (tijos) and the system time.
@@ -84,11 +84,12 @@ public class MQTTClient implements IEC20MqttEventListener {
 	 */
 	public void connect(MQTTConnectOptions options) throws IOException {
 
-		_ec20.mqttDisconnect(0);
-		
+		if(_ec20.isMqttConnected())
+			_ec20.mqttDisconnect(this.client_idx);
+
 		String user = null;
 		String password = null;
-		
+
 		if (options != null) {
 			if (options.getLWTTopic() != null) {
 				_ec20.mqttConfigWillTopic(this.client_idx, options.getLWTQos(), options.getLWTRetained() ? 1 : 0,
@@ -102,13 +103,12 @@ public class MQTTClient implements IEC20MqttEventListener {
 		}
 
 		try {
-			_ec20.mqttConnect(this.client_idx, this._server, this._port, this._clientId, user,
-				password);
-		}
-		catch(IOException ex) {
+			_ec20.mqttConnect(this.client_idx, this._server, this._port, this._clientId, user, password);
+		} catch (IOException ex) {
 			ex.printStackTrace();
-			_ec20.mqttConnect(this.client_idx, this._server, this._port, this._clientId, user,
-					password);
+			_ec20.mqttDisconnect(this.client_idx);
+			Delay.msDelay(2000);
+			_ec20.mqttConnect(this.client_idx, this._server, this._port, this._clientId, user, password);
 		}
 
 	}
@@ -160,16 +160,16 @@ public class MQTTClient implements IEC20MqttEventListener {
 
 	@Override
 	public void onMQTTPublishDataArrived(int client_idx, int msgId, String topic, String message) {
-		 
-		if(this._mqttEventListener != null) {
+
+		if (this._mqttEventListener != null) {
 			this._mqttEventListener.onPublishDataArrived(msgId, topic, message);
 		}
 	}
 
 	@Override
 	public void onMQTTLinkLost(int client_idx, int error) {
-		 
-		if(this._mqttEventListener != null) {
+
+		if (this._mqttEventListener != null) {
 			new Thread(new Runnable() {
 				@Override
 				public void run() {

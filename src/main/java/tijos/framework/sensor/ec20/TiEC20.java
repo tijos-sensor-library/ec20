@@ -12,6 +12,7 @@ import tijos.framework.sensor.ec20.io.TiUartInputStream;
 import tijos.framework.sensor.ec20.io.TiUartOutputStream;
 import tijos.framework.sensor.ec20.mqtt.MQTTClient;
 import tijos.framework.util.Delay;
+import tijos.framework.util.logging.*;
 
 /**
  * Quectel EC20 4G module driver for TiJOS
@@ -54,7 +55,7 @@ public class TiEC20 extends Thread {
 					continue;
 				}
 
-				System.out.println(resp);
+				logMsg(resp);
 
 				if (resp.equals("ERROR") || resp.startsWith("+CME ERROR:")) {
 					this.atResp.setResponse(resp);
@@ -113,9 +114,12 @@ public class TiEC20 extends Thread {
 	 * @return
 	 * @throws IOException
 	 */
-	public boolean check() throws IOException {
+	public boolean isReady() throws IOException {
 		String resp = sendCommand("AT");
-		if (resp.equals("AT"))
+		if(resp == null)
+			return false;
+		
+		if(resp.equals("AT") || resp.length() == 0)
 			return true;
 
 		return false;
@@ -127,7 +131,9 @@ public class TiEC20 extends Thread {
 	 * @throws IOException
 	 */
 	public void turnOnMT() throws IOException {
-		sendCommand("AT+CFUN=1");
+		String resp = sendCommand("AT+CFUN=1");
+		if(!resp.isEmpty())
+			throw new IOException(resp);
 	}
 
 	/**
@@ -146,7 +152,7 @@ public class TiEC20 extends Thread {
 	}
 
 	public void echoOff() throws IOException {
-		sendCommand("ATE0");
+		String resp = sendCommand("ATE0");
 	}
 
 	/**
@@ -155,9 +161,23 @@ public class TiEC20 extends Thread {
 	 * @throws IOException
 	 */
 	public void turnOffMT() throws IOException {
-		sendCommand("AT+CFUN=0");
+		String resp = sendCommand("AT+CFUN=0");
+		if(!resp.isEmpty())
+			throw new IOException(resp);
+
 	}
 
+	/**
+	 * Request TA Model Identification 
+	 * @return
+	 * @throws IOException
+	 */
+	public String getModel() throws IOException {
+		
+		String resp = sendCommand("AT+GMM");
+		return resp;
+	}
+	
 	/**
 	 * 查询 IMSI 码 IMSI 是国际移动用户识别码，International Mobile Subscriber Identification
 	 * Number 的缩写
@@ -167,10 +187,6 @@ public class TiEC20 extends Thread {
 	 */
 	public String getIMSI() throws IOException {
 		String resp = sendCommand("AT+CIMI");
-		if (resp == null) {
-			throw new IOException("Wrong response");
-		}
-
 		return resp;
 	}
 
@@ -227,7 +243,10 @@ public class TiEC20 extends Thread {
 	 * @throws IOException
 	 */
 	public void attachNetwork() throws IOException {
-		sendCommand("AT+CGATT=1");
+		String resp = sendCommand("AT+CGATT=1");
+		if(!resp.isEmpty())
+			throw new IOException(resp);
+
 	}
 
 	/**
@@ -250,7 +269,10 @@ public class TiEC20 extends Thread {
 	 * @throws IOException
 	 */
 	public void activePDPContext() throws IOException {
-		sendCommand("AT+CGACT=1,1");
+		String resp = sendCommand("AT+CGACT=1,1");
+		if(!resp.isEmpty())
+			throw new IOException(resp);
+
 	}
 
 	/**
@@ -260,9 +282,9 @@ public class TiEC20 extends Thread {
 	 * @throws IOException
 	 */
 	public boolean checkSIMCard() throws IOException {
-		String resp = sendCommand("AT+CPIN?");
+		String resp = sendCommand2("AT+CPIN?" , "+CPIN");
 
-		if (resp.equals("OK"))
+		if (resp.equals("+CPIN: READY"))
 			return true;
 
 		return false;
@@ -378,7 +400,10 @@ public class TiEC20 extends Thread {
 			throws IOException {
 		String cmd = "AT+QMTCFG=\"will\"," + id + ",0," + willQos + "," + willRetain + "," + "\"" + willTopic + "\",\""
 				+ willMsg + "\"";
-		sendCommand(cmd);
+		String resp = sendCommand(cmd);
+		if(!resp.isEmpty())
+			throw new IOException(resp);
+
 	}
 
 	/**
@@ -390,7 +415,10 @@ public class TiEC20 extends Thread {
 	 */
 	public void mqttConfigSessionType(int id, int cleanSession) throws IOException {
 		String cmd = "AT+QMTCFG=\"session\"," + id + "," + cleanSession;
-		sendCommand(cmd);
+		String resp = sendCommand(cmd);
+		if(!resp.isEmpty())
+			throw new IOException(resp);
+
 	}
 
 	/**
@@ -405,7 +433,10 @@ public class TiEC20 extends Thread {
 			throws IOException {
 		String cmd = "AT+QMTCFG=\"aliauth\"," + id + "," + "\"" + productKey + "\",\"" + deviceName + "\",\""
 				+ deviceSecret + "\"";
-		sendCommand(cmd);
+		String resp = sendCommand(cmd);
+		if(!resp.isEmpty())
+			throw new IOException(resp);
+
 	}
 
 	/**
@@ -432,7 +463,7 @@ public class TiEC20 extends Thread {
 			String result = resp.substring(pos + 1);
 			int ret = Integer.parseInt(result);
 			if (ret != 0) {
-				throw new IOException("Failed to conenct server, err " + ret);
+				throw new IOException("Failed to open connection, err " + ret);
 			}
 		} else {
 			throw new IOException(resp);
@@ -450,7 +481,7 @@ public class TiEC20 extends Thread {
 		String result = resp.substring(pos + 1);
 		int ret = Integer.parseInt(result);
 		if (ret != 0) {
-			throw new IOException("Failed to conenct server, err " + ret);
+			throw new IOException("Failed to connnect server, err " + ret);
 		}
 
 	}
@@ -463,10 +494,25 @@ public class TiEC20 extends Thread {
 	 */
 	public void mqttDisconnect(int id) throws IOException {
 		String cmd = "AT+QMTDISC=" + id;
-		sendCommand(cmd);
+		sendCommand2(cmd, "+QMTDISC");
 
 		cmd = "AT+QMTCLOSE=" + id;
 		this.sendCommand2(cmd, "+QMTCLOSE");
+	}
+	
+	/**
+	 * Is mqtt server connected or not
+	 * @return
+	 * @throws IOException
+	 */
+	public boolean isMqttConnected() throws IOException{
+		
+		String resp = sendCommand("AT+QMTCONN?");
+		if(resp != null && resp.length() > 5)
+			return true;
+		
+		return false;
+		
 	}
 
 	/**
@@ -487,11 +533,11 @@ public class TiEC20 extends Thread {
 		String resp = sendCommand2(cmd, ">");
 		if (resp.contains("ERROR"))
 			throw new IOException(resp);
-	
+
 		resp = sendCommand2(message, "+QMTPUBEX:");
-		
+
 		int ret = 0;
-		while(resp != null) {
+		while (resp != null) {
 			int begin = resp.indexOf(':');
 			if (begin < 0)
 				throw new IOException("Wrong response");
@@ -499,15 +545,15 @@ public class TiEC20 extends Thread {
 			resp = resp.substring(begin + 2);
 			String[] result = resp.split(",");
 			ret = Integer.parseInt(result[2]);
-			if(ret != 1)
+			if (ret != 1)
 				break;
 
 			resp = this.waitResponse("+QMTPUBEX:", 5000);
 		}
-		
-		if(ret == 2)
+
+		if (ret == 2)
 			throw new IOException("Failed to send packet");
-		
+
 	}
 
 	/**
@@ -595,16 +641,23 @@ public class TiEC20 extends Thread {
 	 */
 	public void startup() throws IOException {
 
+		int loop = 10;
+		while(!this.isReady() && loop -- > 0) {
+			Delay.msDelay(1000);
+		};
+		
+		if(!this.isReady()) 
+			throw new IOException("EC20 is not ready.");
+
 		this.echoOff();
 
-		this.check();
-
-		this.checkSIMCard();
+		if(!this.checkSIMCard())
+			throw new IOException("SIM Card Error");
 
 		this.turnOnMT();
 
 		// 查询模块射频功能状态
-		int loop = 10;
+		loop = 10;
 		while (!isMTOn() && loop-- > 0) {
 			turnOnMT();
 			Delay.msDelay(2000);
@@ -621,6 +674,75 @@ public class TiEC20 extends Thread {
 	}
 
 	/**
+	 * Enable/Disable GNSS to Run Automatically
+	 * 
+	 * @param enable
+	 * @throws IOException
+	 */
+	public void autoGPS(boolean enable) throws IOException {
+		String cmd = "+QGPSCFG:\"autogps\"," + (enable ? 1 : 0);
+		String resp = this.sendCommand(cmd);
+		if (resp.contains("+CME ERROR"))
+			throw new IOException(resp);
+
+	}
+
+	/**
+	 * Turn ON GPS
+	 * 
+	 * @throws IOException
+	 */
+	public void tunOnGPS() throws IOException {
+		String resp = this.sendCommand("AT+QGPS=1");
+		if (resp.contains("+CME ERROR")) {
+			if (!resp.equals("+CME ERROR: 504"))
+				throw new IOException(resp);
+		}
+	}
+
+	/**
+	 * Turn OFF GPS
+	 * 
+	 * @throws IOException
+	 */
+	public void tunOffGPS() throws IOException {
+		String resp = this.sendCommand("AT+QGPS=0");
+		if (resp.contains("+CME ERROR"))
+			throw new IOException(resp);
+	}
+
+	/**
+	 * Get GPS location
+	 * 
+	 * @return gps location, null means location is not ready 
+	 * @throws IOException
+	 */
+	public GPSPosition getGPSPosition() throws IOException {
+		String resp = this.sendCommand("AT+QGPSLOC=1");
+		// not ready
+		if (resp.contains("+CME ERROR")) {
+			return null;
+		}
+
+		GPSPosition gps = new GPSPosition();
+		gps.parse(resp);
+
+		return gps;
+	}
+
+//	public void sendSMS(String target, String message) throws IOException {
+//		
+//		this.sendCommand("AT+CMGF=1");
+//		this.sendCommand("AT+CSCS=\"GSM\"");
+//		
+//		this.sendCommand2("AT+CMGS=\"" + target +"\"", ">");
+//		this.sendCommand2(message, ">");
+//		this.output.write(0x1A);
+//		
+//	}
+	
+	
+	/**
 	 * Send AT command to device
 	 *
 	 * @param cmd
@@ -628,16 +750,15 @@ public class TiEC20 extends Thread {
 	 */
 	private String sendCommand(String cmd) throws IOException {
 
-		// return commandProcess(cmd);
-		System.out.println(cmd);
+		logMsg(cmd);
 
 		synchronized (this.atResp) {
 			try {
 				this.atResp.reset();
 				output.write((cmd + "\r\n").getBytes());
 
-				// this.atResp.wait(5000);
-				this.atResp.wait();
+				this.atResp.wait(5000);
+				//this.atResp.wait();
 
 				return atResp.getResponse();
 
@@ -650,7 +771,7 @@ public class TiEC20 extends Thread {
 
 	private String sendCommand2(String cmd, String expKeyWords) throws IOException {
 
-		System.out.println(cmd);
+		logMsg(cmd);
 		synchronized (this.atResp) {
 			try {
 				this.atResp.reset();
@@ -658,8 +779,8 @@ public class TiEC20 extends Thread {
 
 				output.write((cmd + "\r\n").getBytes());
 
-				// this.atResp.wait(5000);
-				this.atResp.wait();
+				this.atResp.wait(5000);
+				//this.atResp.wait();
 
 				return atResp.getResponse();
 
@@ -670,7 +791,7 @@ public class TiEC20 extends Thread {
 
 		return null;
 	}
-	
+
 	private String waitResponse(String expKeyWords, int timeOut) throws IOException {
 		synchronized (this.atResp) {
 			try {
@@ -678,7 +799,7 @@ public class TiEC20 extends Thread {
 				this.atResp.setExpectedRsp(expKeyWords);
 
 				this.atResp.wait(timeOut);
-	
+
 				return atResp.getResponse();
 
 			} catch (Exception ie) {
@@ -757,6 +878,12 @@ public class TiEC20 extends Thread {
 			output.write((cmd + "\r\n").getBytes());
 		}
 
+	}
+	
+	private void logMsg(String msg)
+	{
+		//Logger.info("EC20", msg);
+		System.out.println(msg);
 	}
 
 }
