@@ -124,17 +124,16 @@ public class TiEC20 extends Thread {
 
 		return false;
 	}
-
+	
 	/**
-	 * 打开模块射频功能
-	 *
-	 * @throws IOException
-	 */
-	public void turnOnMT() throws IOException {
-		String resp = sendCommand("AT+CFUN=1");
-		if(!resp.isEmpty())
-			throw new IOException(resp);
-	}
+   * 打开模块射频功能
+   *
+   * @throws IOException
+   */
+  public void turnOnMT() throws IOException {
+    String resp = sendCommand2("AT+CFUN=1", "+CFUN:");
+
+  }
 
 	/**
 	 * 查询模块射频功能状态
