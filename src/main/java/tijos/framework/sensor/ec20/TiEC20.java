@@ -281,7 +281,7 @@ public class TiEC20 extends Thread {
 	 * @throws IOException
 	 */
 	public boolean checkSIMCard() throws IOException {
-		String resp = sendCommand2("AT+CPIN?" , "+CPIN");
+		String resp = sendCommand2("AT+CPIN?" , "OK");
 
 		if (resp.equals("+CPIN: READY"))
 			return true;
